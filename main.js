@@ -50,7 +50,11 @@ const init = () => {
     animate();
 }
 
-
+const onWindowsResize = () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
 const animate = () => {
     // ユーザーが別のブラウザー タブに移動すると一時停止する
     // q: requestAnimationFrame()は何をしている？
@@ -65,3 +69,4 @@ const animate = () => {
 }
 
 window.addEventListener('load', init);
+window.addEventListener('resize', onWindowsResize);
