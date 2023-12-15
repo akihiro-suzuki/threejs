@@ -1,72 +1,137 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls';
+import * as dat from 'dat.gui';
+//UIデバッグ
+// q: how to install dat.GUI?
+// a: npm install dat.gui
+const gui = new dat.GUI();
 
-let scene, camera, renderer, pointLight;
-const init = () => {
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x333333);
-    // 75度の視野角、アスペクト比、描画開始距離、描画終了距離
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000);
-    camera.position.z = 200;
-    // たぶんデフォルトは原点を向いている
+//サイズ
+const sizes = {
+    width: window.innerWidth,
+    height: window.innerHeight,
+};
 
-    renderer = new THREE.WebGLRenderer();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    // r155からbreaking changeがあったので、一旦legacyを使う
-    renderer.useLegacyLights = true;
-    renderer.setPixelRatio(window.devicePixelRatio);
-    document.body.appendChild(renderer.domElement);
+//シーン
+const scene = new THREE.Scene();
 
+//カメラ
+const camera = new THREE.PerspectiveCamera(
+    75,
+    sizes.width / sizes.height,
+    0.1,
+    1000
+);
+camera.position.x = -2;
+camera.position.y = 1;
+camera.position.z = 4;
+scene.add(camera);
 
-    // キューブの作成
-    // segmentsを指定すると、球の分割数を指定できる
-    const geometry = new THREE.SphereGeometry(100, 128, 64);
-    // 地球テクスチャ
-    let textures = new THREE.TextureLoader().load('textures/earth.jpg');
-    const material = new THREE.MeshPhysicalMaterial({ map: textures });
-    const ball = new THREE.Mesh(geometry, material);
-    scene.add(ball);
+//ライト
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+scene.add(ambientLight);
 
-    // ライトの作成
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(1, 1, 1);
-    scene.add(directionalLight);
+//マテリアル
+const material = new THREE.MeshStandardMaterial();
+material.roughness = 0.3;
 
-    pointLight = new THREE.PointLight(0xffffff, 5);
-    scene.add(pointLight);
-    // pointLight.position.set(100, 100, 100)
+//オブジェクト
+const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.5, 32, 32), material);
+sphere.position.x = -1.5;
 
-    // 第2引数にはsphereのサイズを指定する
-    const pointLightHelper = new THREE.PointLightHelper(pointLight, 30);
-    scene.add(pointLightHelper);
+const cube = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.75, 0.75), material);
 
-    // マウス操作ができるようにする
-    const _ = new OrbitControls(camera, renderer.domElement);
+const torus = new THREE.Mesh(
+    new THREE.TorusGeometry(0.3, 0.2, 32, 64),
+    material
+);
+torus.position.x = 1.5;
 
-    // 座標軸
-    var axes = new THREE.AxesHelper(200);
-    scene.add(axes);
+const plane = new THREE.Mesh(new THREE.PlaneGeometry(5, 5), material);
+plane.rotation.x = -Math.PI * 0.5;
+plane.position.y = -0.65;
 
-    animate();
-}
+scene.add(sphere, cube, torus, plane);
 
-const onWindowsResize = () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
+window.addEventListener("resize", () => {
+    sizes.width = window.innerWidth;
+    sizes.height = window.innerHeight;
+
+    camera.aspect = sizes.width / sizes.height;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
+
+    renderer.setSize(sizes.width, sizes.height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+});
+
+//レンダラー
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize(sizes.width, sizes.height);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.useLegacyLights = true
+document.body.appendChild(renderer.domElement);
+
+
+// add axis helper
+// red is x, green is y, blue is z
+const axesHelper = new THREE.AxesHelper(5);
+scene.add(axesHelper);
+
+// add ambient light
+// q: ambient lightってどういう光？
+// a: 全体を照らす光
+// const ambientLightColor = { color: 0xffffff };
+// gui.addColor(ambientLightColor, "color").onChange(() => {
+//     ambientLight.color.set(ambientLightColor.color);
+// });
+// gui.add(ambientLight, "intensity").min(0).max(1).step(0.001);
+// sscene.add(ambientLight);
+
+
+// add hemisphere light
+// q: hemisphere lightってどういう光？
+// a: 空からの光
+// q: ambient lightとの違いは？
+// a: ambient lightは全体を照らす光だが、hemisphere lightは空からの光を表現する
+// q: hemisphere lightでは影はつかない？
+// a: つかない
+
+// const hemisphereLight = new THREE.HemisphereLight(0x0ffff0, 0xffff00, 1);
+
+// scene.add(hemisphereLight);
+// scene.useLegacyLights = true
+
+// rectAreaLightは、meshstandardmaterialかmeshphisicalmaterialを使わないと反映されない
+const rectAreaLight = new THREE.RectAreaLight(0x4eff00, 1, 3, 4);
+rectAreaLight.position.set(0, 1, 0);
+rectAreaLight.lookAt(0, 0, 0);
+scene.add(rectAreaLight);
+
+const rh = new THREE.RectAreaLightHelper(rectAreaLight);
+
+//コントロール
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+const clock = new THREE.Clock();
+
 const animate = () => {
-    // ユーザーが別のブラウザー タブに移動すると一時停止する
-    // q: requestAnimationFrame()は何をしている？
-    // a: 画面の更新タイミングに合わせて、関数を呼び出す
-    requestAnimationFrame(animate);
+    const elapsedTime = clock.getElapsedTime();
+
+    // Update objects
+    sphere.rotation.y = 0.1 * elapsedTime;
+    cube.rotation.y = 0.1 * elapsedTime;
+    torus.rotation.y = 0.1 * elapsedTime;
+
+    sphere.rotation.x = 0.15 * elapsedTime;
+    cube.rotation.x = 0.15 * elapsedTime;
+    torus.rotation.x = 0.15 * elapsedTime;
+
+    controls.update();
+
     renderer.render(scene, camera);
 
-    const x = 200 * Math.sin(Date.now() / 500);
-    const y = 200 * Math.sin(Date.now() / 1000);
-    const z = 200 * Math.cos(Date.now() / 500);
-    pointLight.position.set(x, y, z);
-}
+    window.requestAnimationFrame(animate);
+};
 
-window.addEventListener('load', init);
-window.addEventListener('resize', onWindowsResize);
+animate();
